@@ -1,10 +1,11 @@
 public class Node{
     public char value;
-    //public boolean tempValue;
+    public ConditionalValidity validity;
     public Node left, right;
 
     public Node(char value){
         left = right = null;
+        validity = ConditionalValidity.UNKNOWN;
         this.value = value;
     }
 
@@ -33,14 +34,16 @@ public class Node{
         if(right!=null) {
             right.toString(new StringBuilder().append(prefix).append(isTail ? "│   " : "    "), false, sb);
         }
-        String newValue = "";
-        if (value == '|') newValue = "OR";
-        else if (value == '^') newValue = "AND";
+        String newValue = String.valueOf(value);
+        if (value == '?') newValue = "OR";
+        else if (value == '&') newValue = "AND";
+        else if (value == '~') newValue = "NOT";
 
-        sb.append(prefix).append(isTail ? "└── " : "┌── ").append(value).append(": ").append("\n");//.append(tempValue)
+        sb.append(prefix).append(isTail ? "└── " : "┌── ").append(newValue).append(": ").append(validity).append("\n");
         if(left!=null) {
             left.toString(new StringBuilder().append(prefix).append(isTail ? "    " : "│   "), true, sb);
         }
         return sb;
     }
 }
+
