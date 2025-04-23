@@ -1,11 +1,11 @@
 public class Node{
     public char value;
-    public ConditionalValidity validity;
+    public ValidityRef validity;
     public Node left, right;
 
-    public Node(char value){
+    public Node(char value) {
         left = right = null;
-        validity = ConditionalValidity.UNKNOWN;
+        validity = new ValidityRef(ConditionalValidity.UNKNOWN);
         this.value = value;
     }
 
@@ -39,7 +39,7 @@ public class Node{
         else if (value == '&') newValue = "AND";
         else if (value == '~') newValue = "NOT";
 
-        sb.append(prefix).append(isTail ? "└── " : "┌── ").append(newValue).append(": ").append(validity).append("\n");
+        sb.append(prefix).append(isTail ? "└── " : "┌── ").append(newValue).append(": ").append(validity.value).append("\n");
         if(left!=null) {
             left.toString(new StringBuilder().append(prefix).append(isTail ? "    " : "│   "), true, sb);
         }
