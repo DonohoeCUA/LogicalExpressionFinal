@@ -1,8 +1,9 @@
 import java.util.LinkedList;
 
 public class LogicTree {
-    Node root;
-    Node[] nodeReferences = new Node[26];//for A-Z
+    private Node root;
+    private Node[] nodeReferences = new Node[26];//for A-Z
+    public boolean isValid = true;
 
     public LogicTree() {
         root = null;
@@ -20,10 +21,7 @@ public class LogicTree {
         //replace any whitespace from string so we don't have to use trim
         String formattedInput = input.replaceAll("\\s", "");
         //checks if main expression is a predicate eg. p>(...)
-        if(formattedInput.length() > 1 && formattedInput.charAt(1) == '>')//char for predicates
-        {
-            formattedInput = '~' + formattedInput.charAt(0) + '?' + formattedInput.substring(2);
-        }
+        formattedInput = turnPredicateToExpression(formattedInput);
         return getPreorderRecursively(formattedInput);
     }
     private String getPreorderRecursively(String input) {
@@ -158,19 +156,145 @@ public class LogicTree {
         return string;
     }
 
-    private void evaluatePredicates(String[] predicates){
-        //types of predicates:
-        //if then:          p > q (if p=true, q=true, if p=false NOTHING HAPPENS)
-        //if and only if:   p iff q (references same value, eg. p=TRUE, q=TRUE)
-        //statement:        p > TRUE, p > FALSE, p (implies TRUE), ~p (implies FALSE)
-        //convert p > q  into  -p | q
+    private void evaluatePredicates(String[] predicates) {
+        for (String currentPredicate : predicates) {
+            String formattedPredicate = currentPredicate.replaceAll("\\s", "").toUpperCase();
+            if (formattedPredicate.isEmpty()) continue;
+
+            // 1) IFF (equality) predicates, e.g. "P=Q"
+            if (formattedPredicate.contains("=") && !formattedPredicate.contains(">")) {
+                String[] tokens = formattedPredicate.split("=");
+                if (tokens.length != 2) {
+                    System.out.println("Error: Invalid iff predicate: " + currentPredicate);
+                    continue;
+                }
+                char variable1 = tokens[0].charAt(0);
+                char variable2 = tokens[1].charAt(0);
+                int index1 = variable1 - 'A';
+                int index2 = variable2 - 'A';
+                if (nodeReferences[index1] == null) nodeReferences[index1] = new Node(variable1);
+                if (nodeReferences[index2] == null) nodeReferences[index2] = new Node(variable2);
+                Node node1 = nodeReferences[index1];
+                Node node2 = nodeReferences[index2];
+
+                // Check equality or invalidate.
+                if (node1.validity.value != ConditionalValidity.UNKNOWN && node2.validity.value != ConditionalValidity.UNKNOWN) {
+                    if (node1.validity.value != node2.validity.value) {
+                        node1.validity = node2.validity = new ValidityRef(ConditionalValidity.INVALID);
+                        isValid = false;
+                    } else {
+                        node2.validity = node1.validity;
+                    }
+                }
+                // Propagate known values
+                else if (node1.validity.value != ConditionalValidity.UNKNOWN) {
+                    node2.validity = node1.validity;
+                } else if (node2.validity.value != ConditionalValidity.UNKNOWN) {
+                    node1.validity = node2.validity;
+                } else {
+                    // Both unknown: link references so future sets affect both.
+                    node2.validity = node1.validity;
+                }
+            }
+            // 2) Implication predicates, e.g. "P>Q" or "P>~Q"
+            else if (formattedPredicate.contains(">")) {
+                String[] tokens = formattedPredicate.split(">");
+                if (tokens.length != 2) {
+                    System.out.println("Error: Invalid if-then predicate: " + currentPredicate);
+                    continue;
+                }
+                String antecedentStr = tokens[0];
+                String consequentStr = tokens[1];
+                boolean isAntecNegated = antecedentStr.startsWith("~");
+                boolean isConseqNegated = consequentStr.startsWith("~");
+                char antecedentChar = isAntecNegated ? antecedentStr.charAt(1) : antecedentStr.charAt(0);
+                char consequentChar = isConseqNegated ? consequentStr.charAt(1) : consequentStr.charAt(0);
+
+                int antecedentIndex = antecedentChar - 'A';
+                int consequentIndex = consequentChar - 'A';
+
+                if (nodeReferences[antecedentIndex] == null) nodeReferences[antecedentIndex] = new Node(antecedentChar);
+                if (nodeReferences[consequentIndex] == null) nodeReferences[consequentIndex] = new Node(consequentChar);
+                Node antecedentNode = nodeReferences[antecedentIndex];
+                Node consequentNode = nodeReferences[consequentIndex];
+
+                boolean isAntecedentTrue = isAntecNegated
+                        ? (antecedentNode.validity.value == ConditionalValidity.FALSE)
+                        : (antecedentNode.validity.value == ConditionalValidity.TRUE);
+                ConditionalValidity requiredConsequentValue = isConseqNegated ? ConditionalValidity.FALSE : ConditionalValidity.TRUE;
+
+                // If antecedent holds, enforce consequent.
+                if (isAntecedentTrue) {
+                    if (consequentNode.validity.value == ConditionalValidity.UNKNOWN) {
+                        consequentNode.validity = new ValidityRef(requiredConsequentValue);
+                    } else if (consequentNode.validity.value != requiredConsequentValue) {
+                        antecedentNode.validity = consequentNode.validity = new ValidityRef(ConditionalValidity.INVALID);
+                        isValid = false;
+                    }
+                }
+                // Contrapositive: if consequent is known false (relative to expectation), enforce antecedent false.
+                if (consequentNode.validity.value != ConditionalValidity.UNKNOWN && consequentNode.validity.value != requiredConsequentValue) {
+                    ConditionalValidity requiredAntecedentValue = isAntecNegated ? ConditionalValidity.TRUE : ConditionalValidity.FALSE;
+                    if (antecedentNode.validity.value == ConditionalValidity.UNKNOWN) {
+                        antecedentNode.validity = new ValidityRef(requiredAntecedentValue);
+                    } else if (antecedentNode.validity.value != requiredAntecedentValue) {
+                        antecedentNode.validity = consequentNode.validity = new ValidityRef(ConditionalValidity.INVALID);
+                        isValid = false;
+                    }
+                }
+            }
+            // 3) Simple assignments: "P", "~P", "P>TRUE", "~P>FALSE"
+            else {
+                String variablePart;
+                String valuePart = null;
+                if (formattedPredicate.contains(">")) {
+                    String[] tokens = formattedPredicate.split(">");
+                    variablePart = tokens[0];
+                    valuePart = tokens[1];
+                } else {
+                    variablePart = formattedPredicate;
+                }
+                boolean isNegated = variablePart.startsWith("~");
+                char variableChar = isNegated ? variablePart.charAt(1) : variablePart.charAt(0);
+                int variableIndex = variableChar - 'A';
+                if (nodeReferences[variableIndex] == null) nodeReferences[variableIndex] = new Node(variableChar);
+                Node variableNode = nodeReferences[variableIndex];
+
+                ConditionalValidity assignedValidity;
+                if (valuePart != null) {
+                    if ("TRUE".equals(valuePart)) assignedValidity = ConditionalValidity.TRUE;
+                    else if ("FALSE".equals(valuePart)) assignedValidity = ConditionalValidity.FALSE;
+                    else {
+                        System.out.println("Error: Invalid assignment predicate: " + currentPredicate);
+                        continue;
+                    }
+                } else {
+                    assignedValidity = isNegated ? ConditionalValidity.FALSE : ConditionalValidity.TRUE;
+                }
+                if (variableNode.validity.value == ConditionalValidity.UNKNOWN) {
+                    variableNode.validity = new ValidityRef(assignedValidity);
+                } else if (variableNode.validity.value != assignedValidity) {
+                    variableNode.validity = new ValidityRef(ConditionalValidity.INVALID);
+                    isValid = false;
+                }
+            }
+        }
+    }
+
+    private String turnPredicateToExpression(String predicateInput){
+        if(predicateInput.length() > 1 && predicateInput.charAt(1) == '>')//char for predicates
+        {
+            return '~' + predicateInput.charAt(0) + '?' + predicateInput.substring(2);
+        }
+        System.out.println("Error: Not formatted as a predicate");
+        return predicateInput;
     }
 
     public void printTree() {
         if (root != null) {
             System.out.println(root);
         } else {
-            System.out.println("Tree is empty.");
+            System.out.println("Error: Tree is empty.");
         }
     }
 }

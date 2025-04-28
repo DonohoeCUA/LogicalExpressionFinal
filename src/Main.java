@@ -16,6 +16,7 @@ public class Main {
 
         Scanner scanner = new Scanner(System.in);  // Create a Scanner object
         String expression = scanner.nextLine();
+        expression = expression.toUpperCase();
 //        String expression = "P ^ -((S) | (Q|P))";
 
         LinkedList<String> predicates = new LinkedList<>();
@@ -33,7 +34,7 @@ public class Main {
         //String[0] when using toArray just takes the size of the list rather than a specified size
         //you could use toArray(new String[predicates.length()]) but that's messier and not convention
         String[] predicatesArray = predicates.toArray(new String[0]);
-        LogicTree evaluator = new LogicTree(expression);
+        LogicTree evaluator = new LogicTree(expression, predicatesArray);
         evaluator.printTree();
     }
 }

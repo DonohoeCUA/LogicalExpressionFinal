@@ -8,6 +8,11 @@ public class Node{
         validity = new ValidityRef(ConditionalValidity.UNKNOWN);
         this.value = value;
     }
+    public Node(char value, ConditionalValidity validity) {
+        left = right = null;
+        validity = validity;
+        this.value = value;
+    }
 
     //adapted from answers from https://stackoverflow.com/questions/4965335/how-to-print-binary-tree-diagram-in-java
     public String toString() {
