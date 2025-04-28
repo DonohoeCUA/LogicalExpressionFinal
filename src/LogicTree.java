@@ -18,7 +18,13 @@ public class LogicTree {
     //Parsing and Formatting input
     public String parseInputToPreorder(String input) {
         //replace any whitespace from string so we don't have to use trim
-        return getPreorderRecursively(input.replaceAll("\\s", ""));
+        String formattedInput = input.replaceAll("\\s", "");
+        //checks if main expression is a predicate eg. p>(...)
+        if(formattedInput.length() > 1 && formattedInput.charAt(1) == '>')//char for predicates
+        {
+            formattedInput = '~' + formattedInput.charAt(0) + '?' + formattedInput.substring(2);
+        }
+        return getPreorderRecursively(formattedInput);
     }
     private String getPreorderRecursively(String input) {
         // De Morgan's Law is checked before opperators incase of (-(...))
@@ -154,11 +160,9 @@ public class LogicTree {
 
     private void evaluatePredicates(String[] predicates){
         //types of predicates:
-        //if then:          p > q
-        //if and only if:   p iff q
-        //statement:        p
-
-
+        //if then:          p > q (if p=true, q=true, if p=false NOTHING HAPPENS)
+        //if and only if:   p iff q (references same value, eg. p=TRUE, q=TRUE)
+        //statement:        p > TRUE, p > FALSE, p (implies TRUE), ~p (implies FALSE)
         //convert p > q  into  -p | q
     }
 

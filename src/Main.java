@@ -3,6 +3,9 @@ import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) {
+
+        //TODO: Predicate into expression for main expression (P>Q turns into ~p or q
+
         for (int i = 0; i < 5; i++) {
             System.out.println();
         }
