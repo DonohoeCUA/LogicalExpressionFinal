@@ -3,12 +3,6 @@ import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) {
-
-        //TODO: Predicate into expression for main expression (P>Q turns into ~p or q
-
-        for (int i = 0; i < 5; i++) {
-            System.out.println();
-        }
         System.out.println("Write your logical expression, followed by its predicates.\n");
         System.out.println("\tFormatting Examples:\nExpression:\tP & ~(S ? Q)\nPredicates:\tP > TRUE\n\t\t\tQ > ~P");
         System.out.println("\nAnd: &\t Or: ?\t Not: ~\t Iff: =\t If-Then: >\n");
@@ -36,5 +30,6 @@ public class Main {
         String[] predicatesArray = predicates.toArray(new String[0]);
         LogicTree evaluator = new LogicTree(expression, predicatesArray);
         evaluator.printTree();
+        //evaluator.evaluate();
     }
 }
