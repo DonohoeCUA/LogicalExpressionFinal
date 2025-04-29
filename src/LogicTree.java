@@ -39,35 +39,33 @@ public class LogicTree {
         return populateRecursively(list);
     }
     private Node populateRecursively(LinkedList<Character> list) {
-        if (list.isEmpty()) {
-            return null;
-        }
+        if (list.isEmpty()) return null;
         char c = list.pollFirst();
 
-        //all variable nodes are leafs, and all variables will have the same value
-        //either true or false. Having direct access to every node will make the assignment
-        //process cheaper when getting values for the tables
         Node node;
-        if (c-'A' >= 0 && c-'A' <= 25 && nodeReferences[c-'A'] != null)
-            node = nodeReferences[c-'A'];
-        else
+        if (c == '&' || c == '?' || c == '~') {
             node = new Node(c);
+        } else if (Character.isLetter(c)) {
+            // new var?
+            if (nodeReferences[c - 'A'] == null) {
+                nodeReferences[c - 'A'] = new Node(c);
+            }
+            node = nodeReferences[c - 'A'];
+        } else {
+            // any other symbol (shouldn’t happen)
+            node = new Node(c);
+        }
 
-        //OPERANDS
+        // 2) Recurse to build its subtree
         if (c == '&' || c == '?') {
-            //both subtrees
-            node.left = populateRecursively(list);
+            node.left  = populateRecursively(list);
             node.right = populateRecursively(list);
         }
-        else if (c == '~'){
-            //catch
-            if (list.isEmpty()) {
-                return null;
-            }
-            char characterAfterNegative = list.pollFirst();
-            node.left = new Node(characterAfterNegative);
+        else if (c == '~') {
+            node.left = populateRecursively(list);
         }
-        //OPERATORS (eg. 'A' or 'Z') will not have any children, thus being a leaf
+        // letters are leaves
+
         return node;
     }
 
@@ -78,7 +76,6 @@ public class LogicTree {
         //checks if main expression is a predicate eg. p>(...) and converts to expression
         if(formattedExpression.contains(">"))//char for predicates
         {
-            System.out.println("main expression is a predicate, has >");
             String[] tokens = formattedExpression.split(">");
             if (tokens.length != 2) {
                 System.out.println("Error: Invalid predicate-based expression: " + input);
@@ -86,7 +83,6 @@ public class LogicTree {
             }
             //turn to ~p ? q       not p or q      form
             formattedExpression = "~" + tokens[0].charAt(0) + "?" + tokens[1];
-            System.out.println("main expression now: " + formattedExpression);
 
         }
         return getPreorderRecursively(formattedExpression);
@@ -166,11 +162,8 @@ public class LogicTree {
             String formattedPredicate = currentPredicate.replaceAll("\\s", "").toUpperCase();
             if (formattedPredicate.isEmpty()) continue;
 
-            System.out.print("P" + ++index + ":" + formattedPredicate);
-
             // 1) IFF (equality) predicates, e.g. "P=Q"
             if (formattedPredicate.contains("=") && !formattedPredicate.contains(">")) {
-                System.out.println("\t is a IFF");
 
                 String[] tokens = formattedPredicate.split("=");
                 if (tokens.length != 2) {
@@ -208,8 +201,6 @@ public class LogicTree {
             }
             // 2) Implication predicates, e.g. "P>Q" or "P>~Q"
             else if (formattedPredicate.contains(">")) {
-                System.out.println("\t is a IF THEN");
-
                 String[] tokens = formattedPredicate.split(">");
                 if (tokens.length != 2) {
                     System.out.println("Error: Invalid if-then predicate: " + currentPredicate);
@@ -258,7 +249,6 @@ public class LogicTree {
             }
             // 3) Simple assignments: "P", "~P"
             else {
-                System.out.println("\t is a simple assignment");
 
                 boolean isNegated = formattedPredicate.startsWith("~");
                 char variableChar = isNegated ? formattedPredicate.charAt(1) : formattedPredicate.charAt(0);
@@ -275,8 +265,6 @@ public class LogicTree {
                 } else if (variableNode.validity.value != assignedValidity) {
                     variableNode.validity = new ValidityRef(ConditionalValidity.INVALID);
                 }
-                System.out.println("NODE " + variableNode.value + " IS SET TO : " + variableNode.validity.value);
-
             }
         }
     }

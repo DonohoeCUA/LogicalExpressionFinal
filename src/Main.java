@@ -29,7 +29,7 @@ public class Main {
         //you could use toArray(new String[predicates.length()]) but that's messier and not convention
         String[] predicatesArray = predicates.toArray(new String[0]);
         LogicTree evaluator = new LogicTree(expression, predicatesArray);
+        evaluator.evaluate();
         evaluator.printTree();
-        //evaluator.evaluate();
     }
 }
