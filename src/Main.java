@@ -4,7 +4,7 @@ import java.util.Scanner;
 public class Main {
     public static void main(String[] args) {
         System.out.println("Write your logical expression, followed by its predicates.\n");
-        System.out.println("\tFormatting Examples:\nExpression:\tP & ~(S ? Q)\nPredicates:\tP > TRUE\n\t\t\tQ > ~P");
+        System.out.println("\tFormatting Examples:\nExpression:\tP & ~(S ? Q)\nPredicates:\tP\n\t\t\tQ > ~P");
         System.out.println("\nAnd: &\t Or: ?\t Not: ~\t Iff: =\t If-Then: >\n");
         System.out.print("Expression:\t");
 
@@ -29,7 +29,14 @@ public class Main {
         //you could use toArray(new String[predicates.length()]) but that's messier and not convention
         String[] predicatesArray = predicates.toArray(new String[0]);
         LogicTree evaluator = new LogicTree(expression, predicatesArray);
-        evaluator.evaluate();
+
+        System.out.println();
+        System.out.println("The statement is " + evaluator.evaluate().toString());
+
+        System.out.println();
         evaluator.printTree();
+
+        System.out.println();
+        evaluator.printPartialTruthTable();
     }
 }

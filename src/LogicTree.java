@@ -11,7 +11,8 @@ public class LogicTree {
     }
     public LogicTree(String expression, String... predicates){
         root = populateTreeInPreorder(expression);
-        evaluatePredicates(predicates);
+        evaluatePredicatesUntilStable(predicates);
+        //evaluatePredicates(predicates);
     }
 
 
@@ -23,7 +24,7 @@ public class LogicTree {
         }
 
         String preorderedExpression = parseInputToPreorder(expression);
-        System.out.println("Preorder Expression: " + preorderedExpression);
+        //System.out.println("Preorder Expression: " + preorderedExpression);
 
         /*
          Im using a LinkedList, because it enables pass by reference, which a string doesn't offer in java.
@@ -156,8 +157,47 @@ public class LogicTree {
         return string;
     }
 
+    /*some predicates like motus potens or tollens require ordering, P>Q, Q, but it never knew Q was true
+    * The repititon is like a shimmy, where it keeps updating so that it will always finish with the final solution
+    * so even if you do, R>S, S>Q, R, it will eventually find its way down to Q, and update it.
+    * */
+    private void evaluatePredicatesUntilStable(String[] predicates) {
+        //order from least to greatest so ideally all of the variable setting (p, ~p etc) is done first
+        // cutting down on any Motus Tollens or Motus Potens opperations
+        for(int i=0;i<predicates.length-1;i++)
+        {
+            for(int j=i+1;j<predicates.length;j++)
+            {
+                if(predicates[i].length()>predicates[j].length())
+                {
+                    String temp=predicates[i];
+                    predicates[i]=predicates[j];
+                    predicates[j]=temp;
+                }
+            }
+        }
+
+        boolean changed;
+        do {
+            changed = false;
+            ConditionalValidity[] before = new ConditionalValidity[26];
+            for (int i = 0; i < 26; i++) {
+                if (nodeReferences[i] != null) {
+                    before[i] = nodeReferences[i].validity.value;
+                }
+            }
+
+            evaluatePredicates(predicates); // apply all again
+
+            for (int i = 0; i < 26; i++) {
+                if (nodeReferences[i] != null && before[i] != nodeReferences[i].validity.value) {
+                    changed = true;
+                }
+            }
+        } while (changed);
+    }
+
     private void evaluatePredicates(String[] predicates) {
-        int index = 0;
         for (String currentPredicate : predicates) {
             String formattedPredicate = currentPredicate.replaceAll("\\s", "").toUpperCase();
             if (formattedPredicate.isEmpty()) continue;
@@ -237,7 +277,7 @@ public class LogicTree {
                         antecedentNode.validity = consequentNode.validity = new ValidityRef(ConditionalValidity.INVALID);
                     }
                 }
-                // MOTUS TOLENS/CONTRAPOSITIVE: if consequent is known false (relative to expectation), enforce antecedent false.
+                // MOTUS TOLENS: if consequent is known false (relative to expectation), enforce antecedent false.
                 if (consequentNode.validity.value != ConditionalValidity.UNKNOWN && consequentNode.validity.value != requiredConsequentValue) {
                     ConditionalValidity requiredAntecedentValue = isAntecNegated ? ConditionalValidity.TRUE : ConditionalValidity.FALSE;
                     if (antecedentNode.validity.value == ConditionalValidity.UNKNOWN) {
@@ -289,15 +329,18 @@ public class LogicTree {
         // If it's an operator
         if (node.value == '~') { // not
             ConditionalValidity childValidity = evaluateNode(node.left);
-            return negate(childValidity);
+            node.validity.value = negate(childValidity);
+            return node.validity.value;
         } else if (node.value == '&') { // and
             ConditionalValidity leftValidity = evaluateNode(node.left);
             ConditionalValidity rightValidity = evaluateNode(node.right);
-            return and(leftValidity, rightValidity);
+            node.validity.value = and(leftValidity, rightValidity);
+            return node.validity.value;
         } else if (node.value == '?') { // or
             ConditionalValidity leftValidity = evaluateNode(node.left);
             ConditionalValidity rightValidity = evaluateNode(node.right);
-            return or(leftValidity, rightValidity);
+            node.validity.value = or(leftValidity, rightValidity);
+            return node.validity.value;
         } else {
             System.out.println("Error: Unknown operator " + node.value);
             return ConditionalValidity.UNKNOWN;
@@ -336,48 +379,149 @@ public class LogicTree {
             System.out.println("Error: Tree is empty.");
         }
     }
-    public void printTable() {
-        /*
-        // Find used variables
-        List<Character> variables = new ArrayList<>();
+    public void printPartialTruthTable() {
+        // 1: Split variables into known and unknown
+        List<Character> unknownVars = new ArrayList<>();
+        List<Character> knownVars = new ArrayList<>();
         for (int i = 0; i < nodeReferences.length; i++) {
-            if (nodeReferences[i] != null) {
-                variables.add((char) ('A' + i));
+            Node node = nodeReferences[i];
+            if (node != null) {
+                if (node.validity.value == ConditionalValidity.UNKNOWN) {
+                    unknownVars.add((char) ('A' + i));
+                } else {
+                    knownVars.add((char) ('A' + i));
+                }
             }
         }
 
-        if (variables.isEmpty()) {
-            System.out.println("No variables to print in the table.");
+        if (unknownVars.isEmpty()) {
+            System.out.println("No unknown variables to build a truth table with.");
+            System.out.println("Result: " + evaluate());
             return;
         }
 
-        // Print header
-        for (char var : variables) {
-            System.out.print(var + "\t");
+        // 2: get all operators for different columns
+        List<Node> subexpressions = new ArrayList<>();
+        collectOperatorNodes(root, subexpressions);
+
+        // 3: Fill in headers
+        List<String> headers = new ArrayList<>();
+        for (char c : knownVars) headers.add(String.valueOf(c));
+        for (char c : unknownVars) headers.add(String.valueOf(c));
+        List<String> expressionLabels = new ArrayList<>();
+        for (Node n : subexpressions) expressionLabels.add(getSubexpressionString(n));
+        headers.addAll(expressionLabels);
+
+        // 4: Figure out the width for formatting
+        int colCount = headers.size();
+        int[] colWidths = new int[colCount];
+        for (int i = 0; i < colCount; i++) {
+            colWidths[i] = headers.get(i).length();
         }
-        System.out.println("| Result");
 
-        int numRows = 1 << variables.size(); // 2^n rows
+        int rowCount = (int) Math.pow(2, unknownVars.size());//2 possibilities (true, false) for every variable
+        List<List<String>> allRows = new ArrayList<>();
 
-        // For each row
-        for (int i = 0; i < numRows; i++) {
-            // Assign TRUE/FALSE based on bits
-            for (int j = 0; j < variables.size(); j++) {
-                char var = variables.get(j);
-                boolean isTrue = ((i >> (variables.size() - j - 1)) & 1) == 1;
-                int varIndex = var - 'A';
-                if (nodeReferences[varIndex] == null) {
-                    nodeReferences[varIndex] = new Node(var);
+        for (int i = 0; i < rowCount; i++) {
+            ValidityRef[] backup = new ValidityRef[26];
+            for (int j = 0; j < 26; j++) {
+                if (nodeReferences[j] != null) {
+                    backup[j] = nodeReferences[j].validity;
+                    nodeReferences[j].validity = new ValidityRef(backup[j].value);
                 }
-                nodeReferences[varIndex].validity = new ValidityRef(isTrue ? ConditionalValidity.TRUE : ConditionalValidity.FALSE);
-                System.out.print((isTrue ? "T" : "F") + "\t");
             }
 
-            // Evaluate with current assignment
-            ConditionalValidity result = evaluate();
-            System.out.println("| " + result);
+            // Set unknowns
+            for (int j = 0; j < unknownVars.size(); j++) {
+                char var = unknownVars.get(j);
+                boolean isTrue = ((i >> (unknownVars.size() - j - 1)) & 1) == 1;
+                nodeReferences[var - 'A'].validity = new ValidityRef(
+                        isTrue ? ConditionalValidity.TRUE : ConditionalValidity.FALSE
+                );
+            }
+
+            List<String> row = new ArrayList<>();
+            for (char c : knownVars) {
+                String val = formatValidity(nodeReferences[c - 'A'].validity.value);
+                row.add(val);
+            }
+            for (char c : unknownVars) {
+                String val = formatValidity(nodeReferences[c - 'A'].validity.value);
+                row.add(val);
+            }
+            for (Node n : subexpressions) {
+                String val = formatValidity(evaluateNode(n));
+                row.add(val);
+            }
+
+            // Update max widths
+            for (int j = 0; j < row.size(); j++) {
+                colWidths[j] = Math.max(colWidths[j], row.get(j).length());
+            }
+
+            allRows.add(row);
+
+            // Restore
+            for (int j = 0; j < 26; j++) {
+                if (nodeReferences[j] != null) {
+                    nodeReferences[j].validity = backup[j];
+                }
+            }
         }
-        */
+
+        //header
+        for (int i = 0; i < colCount; i++) {
+            System.out.print(pad(headers.get(i), colWidths[i]));
+            if (i < colCount - 1) System.out.print(" | ");
+        }
+        System.out.println();
+
+        //rows
+        for (List<String> row : allRows) {
+            for (int i = 0; i < row.size(); i++) {
+                System.out.print(pad(row.get(i), colWidths[i]));
+                if (i < row.size() - 1) System.out.print(" | ");
+            }
+            System.out.println();
+        }
+    }
+    //helper to get nodes
+    private void collectOperatorNodes(Node node, List<Node> list) {
+        if (node == null) return;
+        if (!Character.isLetter(node.value)) list.add(node);
+        collectOperatorNodes(node.left, list);
+        collectOperatorNodes(node.right, list);
     }
 
+    // Converts nodes back into strings
+    private String getSubexpressionString(Node node) {
+        if (node == null) return "";
+        if (Character.isLetter(node.value)) return String.valueOf(node.value);
+        String left = getSubexpressionString(node.left);
+        String right = getSubexpressionString(node.right);
+        switch (node.value) {
+            case '~': return "~" + left;
+            case '&': return "(" + left + "&" + right + ")";
+            case '?': return "(" + left + "?" + right + ")";
+            default: return "(" + left + node.value + right + ")";
+        }
+    }
+
+    //helper convert enum
+    private String formatValidity(ConditionalValidity val) {
+        return switch (val) {
+            case TRUE -> "T";
+            case FALSE -> "F";
+            case UNKNOWN -> "?";
+            case INVALID -> "X";
+        };
+    }
+
+    // Pad string to fixed width (left-aligned)
+    private String pad(String s, int width) {
+        while (s.length() < width) {
+            s += " ";
+        }
+        return s;
+    }
 }
